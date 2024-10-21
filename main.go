@@ -11,9 +11,16 @@ import (
 )
 
 const (
-	gridWidth  int16 = 10
-	gridHeight int16 = 20
-	blank            = "\033[41m "
+	gridWidth  int = 10
+	gridHeight int = 20
+	blank          = "\033[40m "
+	red            = "\033[41m " //[]byte{keyEscape, '[', '3', '1', 'm'},
+	green          = "\033[42m " //[]byte{keyEscape, '[', '3', '2', 'm'},
+	yellow         = "\033[43m " //[]byte{keyEscape, '[', '3', '3', 'm'},
+	blue           = "\033[44m " //[]byte{keyEscape, '[', '3', '4', 'm'},
+	magenta        = "\033[45m " //[]byte{keyEscape, '[', '3', '5', 'm'},
+	cyan           = "\033[46m " //[]byte{keyEscape, '[', '3', '6', 'm'},
+	white          = "\033[47m " //[]byte{keyEscape, '[', '3', '7', 'm'},
 )
 
 type point struct {
@@ -21,12 +28,130 @@ type point struct {
 	y int
 }
 
+type shapeGrid [][]bool
+
 type shape struct {
-	name  string
-	block string
-	grid  [][]bool
-	top   int16
-	left  int16
+	name      string
+	block     string
+	grids     []shapeGrid
+	gridIndex int
+	top       int
+	left      int
+}
+
+var oShape = shape{
+	name:      "",
+	block:     red,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{true, true},
+			{true, true},
+		},
+	},
+	top:  0,
+	left: 4,
+}
+
+var lShape = shape{
+	name:      "",
+	block:     green,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, true, false},
+			{false, true, false},
+			{false, true, true},
+		},
+		{
+			{false, false, false},
+			{true, true, true},
+			{true, false, false},
+		},
+		{
+			{true, true, false},
+			{false, true, false},
+			{false, true, false},
+		},
+		{
+			{false, false, true},
+			{true, true, true},
+			{false, false, false},
+		},
+	},
+	top:  0,
+	left: 4,
+}
+
+var jShape = shape{
+	name:      "",
+	block:     yellow,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, true, false},
+			{false, true, false},
+			{true, true, false},
+		},
+		{
+			{false, false, false},
+			{true, true, true},
+			{false, false, false},
+		},
+		{
+			{false, true, true},
+			{false, true, false},
+			{false, true, false},
+		},
+		{
+			{false, false, false},
+			{true, true, true},
+			{false, false, true},
+		},
+	},
+	top:  0,
+	left: 4,
+}
+
+var iShape = shape{
+	name:      "",
+	block:     blue,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, false, false, false},
+			{true, true, true, true},
+			{false, false, false, false},
+			// {false, false, false, false},
+		},
+		{
+			{false, true, false},
+			{false, true, false},
+			{false, true, false},
+			{false, true, false},
+		},
+		// {
+		// 	{false, false, false, false},
+		// 	{false, false, false, false},
+		// 	{true, true, true, true},
+		// 	{false, false, false, false},
+		// },
+		// {
+		// 	{false, true, false, false},
+		// 	{false, true, false, false},
+		// 	{false, true, false, false},
+		// 	{false, true, false, false},
+		// },
+	},
+	top:  0,
+	left: 4,
+}
+
+var shapeLib = []shape{
+	iShape,
+	jShape,
+	lShape,
+	oShape,
 }
 
 // Function to print the grid
@@ -53,7 +178,7 @@ func render(grid [][]*string) {
 func genGrid(playShape shape) [][]*string {
 	renderPoints := []point{}
 
-	for shapeXIndex, row := range playShape.grid {
+	for shapeXIndex, row := range playShape.grids[playShape.gridIndex] {
 		for shapeYIndex, v := range row {
 			if v {
 				renderPoints = append(renderPoints, point{
@@ -98,17 +223,11 @@ func main() {
 		}
 	}()
 
-	// Create a shape to be rendered
-	oShape := shape{
-		name:  "",
-		block: "\033[46m ",
-		grid:  [][]bool{{true, true}, {true, true}},
-		top:   0,
-		left:  4,
-	}
-
 	var wg sync.WaitGroup
 	wg.Add(1)
+
+	shapeLibIndex := 0
+	playShape := shapeLib[shapeLibIndex]
 
 	alive := true
 	// Goroutine to handle key presses
@@ -122,24 +241,38 @@ func main() {
 			}
 			switch buf[0] {
 			case 'a': // Move left
-				if oShape.left > 0 {
-					oShape.left--
-					grid := genGrid(oShape)
+				if playShape.left > 0 {
+					playShape.left--
+					grid := genGrid(playShape)
 					render(grid)
 				}
 			case 'd': // Move right
-				if oShape.left < int16(gridWidth-2) { // 2 for shape width
-					oShape.left++
-					grid := genGrid(oShape)
+				if playShape.left < int(gridWidth-2) { // 2 for shape width
+					playShape.left++
+					grid := genGrid(playShape)
 					render(grid)
 				}
 			case 's': // Move down
-				if oShape.top < int16(gridHeight-2) { // 2 for shape height
-					oShape.top++
-					grid := genGrid(oShape)
+				if playShape.top < int(gridHeight-2) { // 2 for shape height
+					playShape.top++
+					grid := genGrid(playShape)
 					render(grid)
 				}
-			case 'q': // Quit
+			case 'e': // rotate
+				playShape.gridIndex++
+				if playShape.gridIndex >= len(playShape.grids) {
+					playShape.gridIndex = 0
+				}
+				grid := genGrid(playShape)
+				render(grid)
+			case 'q': // rotate
+				playShape.gridIndex--
+				if playShape.gridIndex < 0 {
+					playShape.gridIndex = len(playShape.grids) - 1
+				}
+				grid := genGrid(playShape)
+				render(grid)
+			case 27: // Quit
 				alive = false
 				return
 			}
@@ -148,12 +281,18 @@ func main() {
 
 	// Update grid values in a loop
 	for alive {
-		grid := genGrid(oShape)
+
+		grid := genGrid(playShape)
 		render(grid)
-		time.Sleep(1 * time.Second)   // Pause for a second
-		oShape.top++                  // Move down every loop iteration
-		if oShape.top >= gridHeight { // Reset shape position for demo purposes
-			oShape.top = 0
+		time.Sleep(1 * time.Second)      // Pause for a second
+		playShape.top++                  // Move down every loop iteration
+		if playShape.top >= gridHeight { // Reset shape position for demo purposes
+			shapeLibIndex++
+			if shapeLibIndex >= len(shapeLib) {
+				shapeLibIndex = 0
+			}
+			playShape = shapeLib[shapeLibIndex]
+			playShape.top = 0
 		}
 	}
 
