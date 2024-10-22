@@ -13,7 +13,7 @@ import (
 const (
 	gridWidth  int = 10
 	gridHeight int = 20
-	blank          = "\033[40m "
+	blank          = white
 	red            = "\033[41m " //[]byte{keyEscape, '[', '3', '1', 'm'},
 	green          = "\033[42m " //[]byte{keyEscape, '[', '3', '2', 'm'},
 	yellow         = "\033[43m " //[]byte{keyEscape, '[', '3', '3', 'm'},
