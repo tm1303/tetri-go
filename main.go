@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	// "image/color"
 	"os"
 	"slices"
 	"sync"
@@ -13,19 +14,29 @@ import (
 const (
 	gridWidth  int = 10
 	gridHeight int = 20
-	blank          = white
-	red            = "\033[41m " //[]byte{keyEscape, '[', '3', '1', 'm'},
-	green          = "\033[42m " //[]byte{keyEscape, '[', '3', '2', 'm'},
-	yellow         = "\033[43m " //[]byte{keyEscape, '[', '3', '3', 'm'},
-	blue           = "\033[44m " //[]byte{keyEscape, '[', '3', '4', 'm'},
-	magenta        = "\033[45m " //[]byte{keyEscape, '[', '3', '5', 'm'},
-	cyan           = "\033[46m " //[]byte{keyEscape, '[', '3', '6', 'm'},
-	white          = "\033[47m " //[]byte{keyEscape, '[', '3', '7', 'm'},
+	gridBuffer int = 4
+
+	showBuffer = true
+)
+
+var (
+	buffer = black
+	blank  = white
+
+	black   = "\033[40m " //[]byte{keyEscape, '[', '3', '1', 'm'},
+	red     = "\033[41m " //[]byte{keyEscape, '[', '3', '1', 'm'},
+	green   = "\033[42m " //[]byte{keyEscape, '[', '3', '2', 'm'},
+	yellow  = "\033[43m " //[]byte{keyEscape, '[', '3', '3', 'm'},
+	blue    = "\033[44m " //[]byte{keyEscape, '[', '3', '4', 'm'},
+	magenta = "\033[45m " //[]byte{keyEscape, '[', '3', '5', 'm'},
+	cyan    = "\033[46m " //[]byte{keyEscape, '[', '3', '6', 'm'},
+	white   = "\033[47m " //[]byte{keyEscape, '[', '3', '7', 'm'},
 )
 
 type point struct {
-	x int
-	y int
+	x     int
+	y     int
+	color *string
 }
 
 type shapeGrid [][]bool
@@ -157,6 +168,7 @@ var shapeLib = []shape{
 // Function to print the grid
 func printGrid(grid [][]*string) {
 	for _, row := range grid {
+
 		for _, val := range row {
 			if val == nil {
 				fmt.Printf("%s", blank)
@@ -164,6 +176,7 @@ func printGrid(grid [][]*string) {
 				fmt.Printf("%s", *val)
 			}
 		}
+
 		fmt.Print("\r\n")
 	}
 }
@@ -175,28 +188,30 @@ func render(grid [][]*string) {
 }
 
 // Generate grid based on the current shape position
-func genGrid(playShape shape) [][]*string {
-	renderPoints := []point{}
+func genGrid(playShape shape, binGrid []point) [][]*string {
+	renderPoints := slices.Clone(binGrid)
 
 	for shapeXIndex, row := range playShape.grids[playShape.gridIndex] {
 		for shapeYIndex, v := range row {
 			if v {
 				renderPoints = append(renderPoints, point{
-					x: shapeXIndex + int(playShape.top),
-					y: shapeYIndex + int(playShape.left),
+					x:     shapeXIndex + int(playShape.top),
+					y:     shapeYIndex + int(playShape.left),
+					color: &playShape.block,
 				})
 			}
 		}
 	}
 
-	grid := make([][]*string, gridHeight)
+	grid := make([][]*string, gridHeight+gridBuffer)
 	for rowIndex := range grid {
 		grid[rowIndex] = make([]*string, gridWidth)
 		for colIndex := range grid[rowIndex] {
-			if slices.ContainsFunc(renderPoints, func(rp point) bool {
+			rpi := slices.IndexFunc(renderPoints, func(rp point) bool {
 				return rowIndex == rp.x && colIndex == rp.y
-			}) {
-				grid[rowIndex][colIndex] = &playShape.block
+			})
+			if rpi > -1 {
+				grid[rowIndex][colIndex] = renderPoints[rpi].color
 				continue
 			}
 			grid[rowIndex][colIndex] = nil
@@ -229,6 +244,29 @@ func main() {
 	shapeLibIndex := 0
 	playShape := shapeLib[shapeLibIndex]
 
+	binGrid := []point{
+		{
+			x:     20,
+			y:     0,
+			color: &black,
+		}, {
+			x:     20,
+			y:     1,
+			color: &black,
+		}, {
+			x:     20,
+			y:     2,
+			color: &red,
+		}, {
+			x:     19,
+			y:     2,
+			color: &red,
+		}, {
+			x:     19,
+			y:     3,
+			color: &red,
+		}}
+
 	alive := true
 	// Goroutine to handle key presses
 	go func() {
@@ -243,19 +281,19 @@ func main() {
 			case 'a': // Move left
 				if playShape.left > 0 {
 					playShape.left--
-					grid := genGrid(playShape)
+					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 'd': // Move right
 				if playShape.left < int(gridWidth-2) { // 2 for shape width
 					playShape.left++
-					grid := genGrid(playShape)
+					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 's': // Move down
-				if playShape.top < int(gridHeight-2) { // 2 for shape height
+				if playShape.top < int(gridHeight+gridBuffer-2) { // 2 for shape height
 					playShape.top++
-					grid := genGrid(playShape)
+					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 'e': // rotate
@@ -263,14 +301,14 @@ func main() {
 				if playShape.gridIndex >= len(playShape.grids) {
 					playShape.gridIndex = 0
 				}
-				grid := genGrid(playShape)
+				grid := genGrid(playShape, binGrid)
 				render(grid)
 			case 'q': // rotate
 				playShape.gridIndex--
 				if playShape.gridIndex < 0 {
 					playShape.gridIndex = len(playShape.grids) - 1
 				}
-				grid := genGrid(playShape)
+				grid := genGrid(playShape, binGrid)
 				render(grid)
 			case 27: // Quit
 				alive = false
@@ -282,11 +320,11 @@ func main() {
 	// Update grid values in a loop
 	for alive {
 
-		grid := genGrid(playShape)
+		grid := genGrid(playShape, binGrid)
 		render(grid)
-		time.Sleep(1 * time.Second)      // Pause for a second
-		playShape.top++                  // Move down every loop iteration
-		if playShape.top >= gridHeight { // Reset shape position for demo purposes
+		time.Sleep(1 * time.Second)                 // Pause for a second
+		dropShape(&playShape)                       // Move down every loop iteration
+		if playShape.top >= gridHeight+gridBuffer { // Reset shape position for demo purposes
 			shapeLibIndex++
 			if shapeLibIndex >= len(shapeLib) {
 				shapeLibIndex = 0
@@ -297,4 +335,8 @@ func main() {
 	}
 
 	wg.Wait() // Wait for the goroutine to finish
+}
+
+func dropShape(playShape *shape) {
+	playShape.top++
 }
