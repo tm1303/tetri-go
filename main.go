@@ -22,15 +22,6 @@ const (
 var (
 	buffer = black
 	blank  = white
-
-	black   = "\033[40m " //[]byte{keyEscape, '[', '3', '1', 'm'},
-	red     = "\033[41m " //[]byte{keyEscape, '[', '3', '1', 'm'},
-	green   = "\033[42m " //[]byte{keyEscape, '[', '3', '2', 'm'},
-	yellow  = "\033[43m " //[]byte{keyEscape, '[', '3', '3', 'm'},
-	blue    = "\033[44m " //[]byte{keyEscape, '[', '3', '4', 'm'},
-	magenta = "\033[45m " //[]byte{keyEscape, '[', '3', '5', 'm'},
-	cyan    = "\033[46m " //[]byte{keyEscape, '[', '3', '6', 'm'},
-	white   = "\033[47m " //[]byte{keyEscape, '[', '3', '7', 'm'},
 )
 
 type point struct {
@@ -48,121 +39,6 @@ type shape struct {
 	gridIndex int
 	top       int
 	left      int
-}
-
-var oShape = shape{
-	name:      "",
-	block:     red,
-	gridIndex: 0,
-	grids: []shapeGrid{
-		{
-			{true, true},
-			{true, true},
-		},
-	},
-	top:  0,
-	left: 4,
-}
-
-var lShape = shape{
-	name:      "",
-	block:     green,
-	gridIndex: 0,
-	grids: []shapeGrid{
-		{
-			{false, true, false},
-			{false, true, false},
-			{false, true, true},
-		},
-		{
-			{false, false, false},
-			{true, true, true},
-			{true, false, false},
-		},
-		{
-			{true, true, false},
-			{false, true, false},
-			{false, true, false},
-		},
-		{
-			{false, false, true},
-			{true, true, true},
-			{false, false, false},
-		},
-	},
-	top:  0,
-	left: 4,
-}
-
-var jShape = shape{
-	name:      "",
-	block:     yellow,
-	gridIndex: 0,
-	grids: []shapeGrid{
-		{
-			{false, true, false},
-			{false, true, false},
-			{true, true, false},
-		},
-		{
-			{false, false, false},
-			{true, true, true},
-			{false, false, false},
-		},
-		{
-			{false, true, true},
-			{false, true, false},
-			{false, true, false},
-		},
-		{
-			{false, false, false},
-			{true, true, true},
-			{false, false, true},
-		},
-	},
-	top:  0,
-	left: 4,
-}
-
-var iShape = shape{
-	name:      "",
-	block:     blue,
-	gridIndex: 0,
-	grids: []shapeGrid{
-		{
-			{false, false, false, false},
-			{true, true, true, true},
-			{false, false, false, false},
-			// {false, false, false, false},
-		},
-		{
-			{false, true, false},
-			{false, true, false},
-			{false, true, false},
-			{false, true, false},
-		},
-		// {
-		// 	{false, false, false, false},
-		// 	{false, false, false, false},
-		// 	{true, true, true, true},
-		// 	{false, false, false, false},
-		// },
-		// {
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// },
-	},
-	top:  0,
-	left: 4,
-}
-
-var shapeLib = []shape{
-	iShape,
-	jShape,
-	lShape,
-	oShape,
 }
 
 // Function to print the grid
@@ -185,6 +61,40 @@ func printGrid(grid [][]*string) {
 func render(grid [][]*string) {
 	fmt.Print("\033[H") // ANSI escape to move cursor to top-left corner
 	printGrid(grid)
+}
+
+func testPlayPoints(playShape shape, binGrid []point, vMov int, hMov int, rotMov int) bool {
+
+	renderPoints := []point{}
+
+	rotIndex := playShape.gridIndex+rotMov
+	if rotIndex < 0 {
+		rotIndex = len(playShape.grids) - 1
+	}
+	if rotIndex >= len(playShape.grids) {
+		rotIndex = 0
+	}
+	for shapeXIndex, row := range playShape.grids[rotIndex] {
+		for shapeYIndex, v := range row {
+			if v {
+				renderPoints = append(renderPoints, point{
+					x:     shapeXIndex + int(playShape.top+vMov),
+					y:     shapeYIndex + int(playShape.left+hMov),
+					color: &playShape.block,
+				})
+			}
+		}
+	}
+
+	for _, bp := range binGrid {
+		if slices.ContainsFunc(renderPoints, func(rp point) bool {
+			return bp.x == rp.x && bp.y == rp.y
+		}) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Generate grid based on the current shape position
@@ -279,24 +189,36 @@ func main() {
 			}
 			switch buf[0] {
 			case 'a': // Move left
+				if !testPlayPoints(playShape, binGrid, 0, -1, 0) {
+					continue
+				}
 				if playShape.left > 0 {
 					playShape.left--
 					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 'd': // Move right
+				if !testPlayPoints(playShape, binGrid, 0, 1, 0) {
+					continue
+				}
 				if playShape.left < int(gridWidth-2) { // 2 for shape width
 					playShape.left++
 					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 's': // Move down
+				if !testPlayPoints(playShape, binGrid, 1, 0, 0) {
+					continue
+				}
 				if playShape.top < int(gridHeight+gridBuffer-2) { // 2 for shape height
 					playShape.top++
 					grid := genGrid(playShape, binGrid)
 					render(grid)
 				}
 			case 'e': // rotate
+				if !testPlayPoints(playShape, binGrid, 0, 0, 1) {
+					continue
+				}
 				playShape.gridIndex++
 				if playShape.gridIndex >= len(playShape.grids) {
 					playShape.gridIndex = 0
@@ -304,6 +226,9 @@ func main() {
 				grid := genGrid(playShape, binGrid)
 				render(grid)
 			case 'q': // rotate
+				if !testPlayPoints(playShape, binGrid, 0, 0, -1) {
+					continue
+				}
 				playShape.gridIndex--
 				if playShape.gridIndex < 0 {
 					playShape.gridIndex = len(playShape.grids) - 1
@@ -322,8 +247,12 @@ func main() {
 
 		grid := genGrid(playShape, binGrid)
 		render(grid)
-		time.Sleep(1 * time.Second)                 // Pause for a second
-		dropShape(&playShape)                       // Move down every loop iteration
+		time.Sleep(1 * time.Second) // Pause for a second
+
+		if testPlayPoints(playShape, binGrid, 1, 0, 0) {
+			dropShape(&playShape) // Move down every loop iteration
+		}
+
 		if playShape.top >= gridHeight+gridBuffer { // Reset shape position for demo purposes
 			shapeLibIndex++
 			if shapeLibIndex >= len(shapeLib) {
