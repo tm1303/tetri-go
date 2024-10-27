@@ -97,8 +97,8 @@ func testPlayPoints(playShape shape, binGrid []point, vMov int, hMov int, rotMov
 	return true
 }
 
-// Generate grid based on the current shape position
-func genGrid(playShape shape, binGrid []point) [][]*string {
+
+func combinePoints(playShape shape, binGrid []point) []point {
 	renderPoints := slices.Clone(binGrid)
 
 	for shapeXIndex, row := range playShape.grids[playShape.gridIndex] {
@@ -112,6 +112,13 @@ func genGrid(playShape shape, binGrid []point) [][]*string {
 			}
 		}
 	}
+
+	return renderPoints
+}
+
+// Generate grid based on the current shape position
+func genGrid(playShape shape, binGrid []point) [][]*string {
+	renderPoints := combinePoints(playShape, binGrid)
 
 	grid := make([][]*string, gridHeight+gridBuffer)
 	for rowIndex := range grid {
@@ -249,11 +256,10 @@ func main() {
 		render(grid)
 		time.Sleep(1 * time.Second) // Pause for a second
 
-		if testPlayPoints(playShape, binGrid, 1, 0, 0) {
-			dropShape(&playShape) // Move down every loop iteration
-		}
+		if !testPlayPoints(playShape, binGrid, 1, 0, 0) {
 
-		if playShape.top >= gridHeight+gridBuffer { // Reset shape position for demo purposes
+			binGrid = combinePoints(playShape, binGrid) // get in the bin
+
 			shapeLibIndex++
 			if shapeLibIndex >= len(shapeLib) {
 				shapeLibIndex = 0
@@ -261,6 +267,9 @@ func main() {
 			playShape = shapeLib[shapeLibIndex]
 			playShape.top = 0
 		}
+
+		dropShape(&playShape) // Move down every loop iteration
+
 	}
 
 	wg.Wait() // Wait for the goroutine to finish
