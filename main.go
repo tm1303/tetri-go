@@ -63,17 +63,18 @@ func render(grid [][]*string) {
 	printGrid(grid)
 }
 
-func testPlayPoints(playShape shape, binGrid []point, vMov int, hMov int, rotMov int) bool {
+func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov int) bool {
 
 	renderPoints := []point{}
 
-	rotIndex := playShape.gridIndex+rotMov
+	rotIndex := playShape.gridIndex + rotMov
 	if rotIndex < 0 {
 		rotIndex = len(playShape.grids) - 1
 	}
 	if rotIndex >= len(playShape.grids) {
 		rotIndex = 0
 	}
+
 	for shapeXIndex, row := range playShape.grids[rotIndex] {
 		for shapeYIndex, v := range row {
 			if v {
@@ -86,8 +87,17 @@ func testPlayPoints(playShape shape, binGrid []point, vMov int, hMov int, rotMov
 		}
 	}
 
-	for _, bp := range binGrid {
-		if slices.ContainsFunc(renderPoints, func(rp point) bool {
+	for _, rp := range renderPoints {
+
+		if rp.y < 0 || rp.y > gridWidth-1 {
+			return false
+		}
+
+		if rp.x > gridHeight+gridBuffer-1 {
+			return false
+		}
+
+		if slices.ContainsFunc(binGrid, func(bp point) bool {
 			return bp.x == rp.x && bp.y == rp.y
 		}) {
 			return false
@@ -96,7 +106,6 @@ func testPlayPoints(playShape shape, binGrid []point, vMov int, hMov int, rotMov
 
 	return true
 }
-
 
 func combinePoints(playShape shape, binGrid []point) []point {
 	renderPoints := slices.Clone(binGrid)
@@ -161,28 +170,7 @@ func main() {
 	shapeLibIndex := 0
 	playShape := shapeLib[shapeLibIndex]
 
-	binGrid := []point{
-		{
-			x:     20,
-			y:     0,
-			color: &black,
-		}, {
-			x:     20,
-			y:     1,
-			color: &black,
-		}, {
-			x:     20,
-			y:     2,
-			color: &red,
-		}, {
-			x:     19,
-			y:     2,
-			color: &red,
-		}, {
-			x:     19,
-			y:     3,
-			color: &red,
-		}}
+	binGrid := make([]point, (gridHeight+gridBuffer)*gridWidth)
 
 	alive := true
 	// Goroutine to handle key presses
@@ -196,34 +184,28 @@ func main() {
 			}
 			switch buf[0] {
 			case 'a': // Move left
-				if !testPlayPoints(playShape, binGrid, 0, -1, 0) {
+				if !playPointsOk(playShape, binGrid, 0, -1, 0) {
 					continue
 				}
-				if playShape.left > 0 {
-					playShape.left--
-					grid := genGrid(playShape, binGrid)
-					render(grid)
-				}
+				playShape.left--
+				grid := genGrid(playShape, binGrid)
+				render(grid)
 			case 'd': // Move right
-				if !testPlayPoints(playShape, binGrid, 0, 1, 0) {
+				if !playPointsOk(playShape, binGrid, 0, 1, 0) {
 					continue
 				}
-				if playShape.left < int(gridWidth-2) { // 2 for shape width
-					playShape.left++
-					grid := genGrid(playShape, binGrid)
-					render(grid)
-				}
+				playShape.left++
+				grid := genGrid(playShape, binGrid)
+				render(grid)
 			case 's': // Move down
-				if !testPlayPoints(playShape, binGrid, 1, 0, 0) {
+				if !playPointsOk(playShape, binGrid, 1, 0, 0) {
 					continue
 				}
-				if playShape.top < int(gridHeight+gridBuffer-2) { // 2 for shape height
-					playShape.top++
-					grid := genGrid(playShape, binGrid)
-					render(grid)
-				}
+				playShape.top++
+				grid := genGrid(playShape, binGrid)
+				render(grid)
 			case 'e': // rotate
-				if !testPlayPoints(playShape, binGrid, 0, 0, 1) {
+				if !playPointsOk(playShape, binGrid, 0, 0, 1) {
 					continue
 				}
 				playShape.gridIndex++
@@ -233,7 +215,7 @@ func main() {
 				grid := genGrid(playShape, binGrid)
 				render(grid)
 			case 'q': // rotate
-				if !testPlayPoints(playShape, binGrid, 0, 0, -1) {
+				if !playPointsOk(playShape, binGrid, 0, 0, -1) {
 					continue
 				}
 				playShape.gridIndex--
@@ -256,7 +238,7 @@ func main() {
 		render(grid)
 		time.Sleep(1 * time.Second) // Pause for a second
 
-		if !testPlayPoints(playShape, binGrid, 1, 0, 0) {
+		if !playPointsOk(playShape, binGrid, 1, 0, 0) {
 
 			binGrid = combinePoints(playShape, binGrid) // get in the bin
 
