@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	// "log"
 	// "image/color"
 	"os"
 	"slices"
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/term"
 )
 
@@ -63,9 +65,7 @@ func render(grid [][]*string) {
 	printGrid(grid)
 }
 
-func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov int) bool {
-
-	renderPoints := []point{}
+func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, rotMov int) bool {
 
 	rotIndex := playShape.gridIndex + rotMov
 	if rotIndex < 0 {
@@ -74,6 +74,8 @@ func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov i
 	if rotIndex >= len(playShape.grids) {
 		rotIndex = 0
 	}
+
+	renderPoints := []point{}
 
 	for shapeXIndex, row := range playShape.grids[rotIndex] {
 		for shapeYIndex, v := range row {
@@ -87,6 +89,11 @@ func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov i
 		}
 	}
 
+	binPoints := make([]point, 0, len(binGrid))
+	for _, v := range binGrid {
+		binPoints = append(binPoints, v...)
+	}
+
 	for _, rp := range renderPoints {
 
 		if rp.y < 0 || rp.y > gridWidth-1 {
@@ -97,7 +104,7 @@ func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov i
 			return false
 		}
 
-		if slices.ContainsFunc(binGrid, func(bp point) bool {
+		if slices.ContainsFunc(binPoints, func(bp point) bool {
 			return bp.x == rp.x && bp.y == rp.y
 		}) {
 			return false
@@ -107,14 +114,20 @@ func playPointsOk(playShape shape, binGrid []point, vMov int, hMov int, rotMov i
 	return true
 }
 
-func combinePoints(playShape shape, binGrid []point) []point {
-	renderPoints := slices.Clone(binGrid)
+func combinePoints(playShape shape, binGrid map[int][]point) map[int][]point {
+	//renderPoints := maps.Clone(binGrid)
+	renderPoints := make(map[int][]point, 0)
+	for i, binPoints := range binGrid {
+		renderPoints[i] = slices.Clone(binPoints)
+	}
 
 	for shapeXIndex, row := range playShape.grids[playShape.gridIndex] {
+
 		for shapeYIndex, v := range row {
 			if v {
-				renderPoints = append(renderPoints, point{
-					x:     shapeXIndex + int(playShape.top),
+				newX := shapeXIndex + int(playShape.top)
+				renderPoints[newX] = append(renderPoints[newX], point{
+					x:     newX,
 					y:     shapeYIndex + int(playShape.left),
 					color: &playShape.block,
 				})
@@ -125,9 +138,29 @@ func combinePoints(playShape shape, binGrid []point) []point {
 	return renderPoints
 }
 
+func tidyBin(binGrid map[int][]point) map[int][]point {
+
+	newBin := map[int][]point{}
+
+	for i, binRow := range binGrid {
+		if len(binRow) >= gridWidth {
+			log.Debug().Msgf("bin row %d", i)
+		} else {
+			newBin[i] = binRow
+		}
+	}
+
+	return newBin
+}
+
 // Generate grid based on the current shape position
-func genGrid(playShape shape, binGrid []point) [][]*string {
-	renderPoints := combinePoints(playShape, binGrid)
+func genGrid(playShape shape, binGrid map[int][]point) [][]*string {
+	combined := combinePoints(playShape, binGrid)
+
+	renderPoints := make([]point, 0, len(combined))
+	for _, v := range combined {
+		renderPoints = append(renderPoints, v...)
+	}
 
 	grid := make([][]*string, gridHeight+gridBuffer)
 	for rowIndex := range grid {
@@ -149,6 +182,10 @@ func genGrid(playShape shape, binGrid []point) [][]*string {
 
 // Main function
 func main() {
+
+	wsLogger := initWsLog()
+	log.Logger = log.Output(wsLogger)
+
 	// Reset view
 	fmt.Print("\033[2J") // Clear screen first
 	fmt.Print("\033[H")  // Move to top left
@@ -170,7 +207,7 @@ func main() {
 	shapeLibIndex := 0
 	playShape := shapeLib[shapeLibIndex]
 
-	binGrid := make([]point, (gridHeight+gridBuffer)*gridWidth)
+	binGrid := make(map[int][]point, 0)
 
 	alive := true
 	// Goroutine to handle key presses
@@ -241,6 +278,7 @@ func main() {
 		if !playPointsOk(playShape, binGrid, 1, 0, 0) {
 
 			binGrid = combinePoints(playShape, binGrid) // get in the bin
+			binGrid = tidyBin(binGrid)
 
 			shapeLibIndex++
 			if shapeLibIndex >= len(shapeLib) {
@@ -248,6 +286,8 @@ func main() {
 			}
 			playShape = shapeLib[shapeLibIndex]
 			playShape.top = 0
+
+			log.Debug().Msgf("new shape %s\n", playShape.name)
 		}
 
 		dropShape(&playShape) // Move down every loop iteration
