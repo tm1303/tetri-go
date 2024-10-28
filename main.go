@@ -18,12 +18,12 @@ const (
 	gridHeight int = 20
 	gridBuffer int = 4
 
-	showBuffer = true
+	// showBuffer = true
 )
 
 var (
-	buffer = black
-	blank  = white
+	// buffer = black
+	blank = white
 )
 
 type renderPoint struct {
@@ -96,13 +96,13 @@ func playPointsOk(playShape shape, binGrid map[int][]playUnit, vMov int, hMov in
 
 	binPoints := make([]renderPoint, 0, len(binGrid))
 	for x, playUnits := range binGrid {
-		for _, playUnit := range playUnits{
+		for _, playUnit := range playUnits {
 			binPoints = append(binPoints, renderPoint{
 				x:     x,
 				y:     playUnit.y,
 				color: playUnit.color,
 			})
-		}	
+		}
 	}
 
 	for _, rp := range renderPoints {
@@ -111,7 +111,7 @@ func playPointsOk(playShape shape, binGrid map[int][]playUnit, vMov int, hMov in
 			return false
 		}
 
-		if rp.x > gridHeight+gridBuffer-1 {
+		if rp.x > gridHeight-1 {
 			return false
 		}
 
@@ -149,7 +149,7 @@ func combinePoints(playShape shape, binGrid map[int][]playUnit) map[int][]playUn
 	return renderPoints
 }
 
-func tidyBin(binGrid map[int][]playUnit) map[int][]playUnit {
+func tidyBin(binGrid map[int][]playUnit) (map[int][]playUnit, int) {
 
 	newBin := map[int][]playUnit{}
 	removedCount := 0
@@ -178,7 +178,7 @@ func tidyBin(binGrid map[int][]playUnit) map[int][]playUnit {
 		log.Debug().Msgf("new bin  %v", newBin)
 	}
 
-	return newBin
+	return newBin, removedCount
 }
 
 // Generate grid based on the current shape position
@@ -190,7 +190,7 @@ func genGrid(playShape shape, binGrid map[int][]playUnit) [][]*string {
 	// 	renderPoints = append(renderPoints, v...)
 	// }
 
-	grid := make([][]*string, gridHeight+gridBuffer)
+	grid := make([][]*string, gridHeight)
 	for rowIndex := range grid {
 		grid[rowIndex] = make([]*string, gridWidth)
 		for colIndex := range grid[rowIndex] {
@@ -234,6 +234,7 @@ func main() {
 
 	shapeLibIndex := 0
 	playShape := shapeLib[shapeLibIndex]
+	playShape.top = -gridBuffer
 
 	binGrid := make(map[int][]playUnit, 0)
 
@@ -296,26 +297,36 @@ func main() {
 		}
 	}()
 
+	pauseFactor := time.Duration(1000)
+	score := 0
 	// Update grid values in a loop
 	for alive {
+		score++
 
 		grid := genGrid(playShape, binGrid)
 		render(grid)
-		time.Sleep(1 * time.Second) // Pause for a second
+		fmt.Printf("%sscore: %d\r\n", white, score)
+		time.Sleep(pauseFactor * time.Millisecond) // Pause for a second
 
 		if !playPointsOk(playShape, binGrid, 1, 0, 0) {
-
+			score=score+2
 			binGrid = combinePoints(playShape, binGrid) // get in the bin
-			binGrid = tidyBin(binGrid)
+			removedCount := 0
+			binGrid, removedCount = tidyBin(binGrid)
+			if removedCount > 0 {
+				score = (4 * removedCount * removedCount) + score
+				pauseFactor = time.Duration(0.95 * float64(pauseFactor))
+			}
 
 			shapeLibIndex++
 			if shapeLibIndex >= len(shapeLib) {
 				shapeLibIndex = 0
 			}
 			playShape = shapeLib[shapeLibIndex]
-			playShape.top = 0
+			playShape.top = -gridBuffer
 
 			log.Debug().Msgf("new shape %s\n", playShape.name)
+
 		}
 
 		dropShape(&playShape) // Move down every loop iteration
