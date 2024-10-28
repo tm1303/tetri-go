@@ -26,8 +26,13 @@ var (
 	blank  = white
 )
 
-type point struct {
+type renderPoint struct {
 	x     int
+	y     int
+	color *string
+}
+
+type playUnit struct {
 	y     int
 	color *string
 }
@@ -65,7 +70,7 @@ func render(grid [][]*string) {
 	printGrid(grid)
 }
 
-func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, rotMov int) bool {
+func playPointsOk(playShape shape, binGrid map[int][]playUnit, vMov int, hMov int, rotMov int) bool {
 
 	rotIndex := playShape.gridIndex + rotMov
 	if rotIndex < 0 {
@@ -75,12 +80,12 @@ func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, 
 		rotIndex = 0
 	}
 
-	renderPoints := []point{}
+	renderPoints := []renderPoint{}
 
 	for shapeXIndex, row := range playShape.grids[rotIndex] {
 		for shapeYIndex, v := range row {
 			if v {
-				renderPoints = append(renderPoints, point{
+				renderPoints = append(renderPoints, renderPoint{
 					x:     shapeXIndex + int(playShape.top+vMov),
 					y:     shapeYIndex + int(playShape.left+hMov),
 					color: &playShape.block,
@@ -89,9 +94,15 @@ func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, 
 		}
 	}
 
-	binPoints := make([]point, 0, len(binGrid))
-	for _, v := range binGrid {
-		binPoints = append(binPoints, v...)
+	binPoints := make([]renderPoint, 0, len(binGrid))
+	for x, playUnits := range binGrid {
+		for _, playUnit := range playUnits{
+			binPoints = append(binPoints, renderPoint{
+				x:     x,
+				y:     playUnit.y,
+				color: playUnit.color,
+			})
+		}	
 	}
 
 	for _, rp := range renderPoints {
@@ -104,7 +115,7 @@ func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, 
 			return false
 		}
 
-		if slices.ContainsFunc(binPoints, func(bp point) bool {
+		if slices.ContainsFunc(binPoints, func(bp renderPoint) bool {
 			return bp.x == rp.x && bp.y == rp.y
 		}) {
 			return false
@@ -114,9 +125,9 @@ func playPointsOk(playShape shape, binGrid map[int][]point, vMov int, hMov int, 
 	return true
 }
 
-func combinePoints(playShape shape, binGrid map[int][]point) map[int][]point {
+func combinePoints(playShape shape, binGrid map[int][]playUnit) map[int][]playUnit {
 	//renderPoints := maps.Clone(binGrid)
-	renderPoints := make(map[int][]point, 0)
+	renderPoints := make(map[int][]playUnit, 0)
 	for i, binPoints := range binGrid {
 		renderPoints[i] = slices.Clone(binPoints)
 	}
@@ -126,8 +137,8 @@ func combinePoints(playShape shape, binGrid map[int][]point) map[int][]point {
 		for shapeYIndex, v := range row {
 			if v {
 				newX := shapeXIndex + int(playShape.top)
-				renderPoints[newX] = append(renderPoints[newX], point{
-					x:     newX,
+				renderPoints[newX] = append(renderPoints[newX], playUnit{
+					// x:     newX,
 					y:     shapeYIndex + int(playShape.left),
 					color: &playShape.block,
 				})
@@ -138,39 +149,56 @@ func combinePoints(playShape shape, binGrid map[int][]point) map[int][]point {
 	return renderPoints
 }
 
-func tidyBin(binGrid map[int][]point) map[int][]point {
+func tidyBin(binGrid map[int][]playUnit) map[int][]playUnit {
 
-	newBin := map[int][]point{}
+	newBin := map[int][]playUnit{}
+	removedCount := 0
 
-	for i, binRow := range binGrid {
+	keys := make([]int, 0, len(binGrid))
+	for k := range binGrid {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	log.Debug().Msgf("keys %v", keys)
+
+	for i := len(keys) - 1; i >= 0; i-- {
+		k := keys[i]
+		log.Debug().Msgf("key %d", k)
+		binRow := binGrid[k]
+		// for i, binRow := range binGrid {
 		if len(binRow) >= gridWidth {
-			log.Debug().Msgf("bin row %d", i)
+			log.Debug().Msgf("bin row %d", k)
+			removedCount++
 		} else {
-			newBin[i] = binRow
+			newBin[k+removedCount] = binRow
 		}
+	}
+
+	if removedCount > 0 {
+		log.Debug().Msgf("new bin  %v", newBin)
 	}
 
 	return newBin
 }
 
 // Generate grid based on the current shape position
-func genGrid(playShape shape, binGrid map[int][]point) [][]*string {
+func genGrid(playShape shape, binGrid map[int][]playUnit) [][]*string {
 	combined := combinePoints(playShape, binGrid)
 
-	renderPoints := make([]point, 0, len(combined))
-	for _, v := range combined {
-		renderPoints = append(renderPoints, v...)
-	}
+	// renderPoints := make([]playUnit, 0, len(combined))
+	// for _, v := range combined {
+	// 	renderPoints = append(renderPoints, v...)
+	// }
 
 	grid := make([][]*string, gridHeight+gridBuffer)
 	for rowIndex := range grid {
 		grid[rowIndex] = make([]*string, gridWidth)
 		for colIndex := range grid[rowIndex] {
-			rpi := slices.IndexFunc(renderPoints, func(rp point) bool {
-				return rowIndex == rp.x && colIndex == rp.y
+			rpi := slices.IndexFunc(combined[rowIndex], func(rp playUnit) bool {
+				return colIndex == rp.y //rowIndex == rp.x && colIndex == rp.y
 			})
 			if rpi > -1 {
-				grid[rowIndex][colIndex] = renderPoints[rpi].color
+				grid[rowIndex][colIndex] = combined[rowIndex][rpi].color
 				continue
 			}
 			grid[rowIndex][colIndex] = nil
@@ -207,7 +235,7 @@ func main() {
 	shapeLibIndex := 0
 	playShape := shapeLib[shapeLibIndex]
 
-	binGrid := make(map[int][]point, 0)
+	binGrid := make(map[int][]playUnit, 0)
 
 	alive := true
 	// Goroutine to handle key presses
