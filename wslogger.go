@@ -63,23 +63,10 @@ func (wsl *WebSocketLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func initWsLog() *WebSocketLogger{
-	// Create WebSocket logger
+
 	wsLogger := NewWebSocketLogger()
 
-	// Configure zerolog to write to both the WebSocket logger and console
-	// log.Logger = log.Output(wsLogger)
-
-	// Set up WebSocket route
 	http.Handle("/ws", wsLogger)
-
-	// go func() {
-	// 	// Simulate log messages every second
-	// 	for {
-	// 		log.Info().Msg("Info log message for WebSocket clients")
-	// 		log.Error().Msg("Error log message for WebSocket clients")
-	// 		time.Sleep(1 * time.Second)
-	// 	}
-	// }()
 
 	// Start HTTP server for WebSocket connections
 	go func() {

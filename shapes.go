@@ -14,7 +14,7 @@ var (
 )
 
 var oShape = shape{
-	name:      "",
+	name:      "O",
 	block:     red,
 	gridIndex: 0,
 	grids: []shapeGrid{
@@ -28,7 +28,7 @@ var oShape = shape{
 }
 
 var lShape = shape{
-	name:      "",
+	name:      "L",
 	block:     green,
 	gridIndex: 0,
 	grids: []shapeGrid{
@@ -58,7 +58,7 @@ var lShape = shape{
 }
 
 var jShape = shape{
-	name:      "",
+	name:      "J",
 	block:     yellow,
 	gridIndex: 0,
 	grids: []shapeGrid{
@@ -88,7 +88,7 @@ var jShape = shape{
 }
 
 var iShape = shape{
-	name:      "",
+	name:      "I",
 	block:     blue,
 	gridIndex: 0,
 	grids: []shapeGrid{
@@ -96,7 +96,6 @@ var iShape = shape{
 			{false, false, false, false},
 			{true, true, true, true},
 			{false, false, false, false},
-			// {false, false, false, false},
 		},
 		{
 			{false, true, false},
@@ -104,26 +103,120 @@ var iShape = shape{
 			{false, true, false},
 			{false, true, false},
 		},
-		// {
-		// 	{false, false, false, false},
-		// 	{false, false, false, false},
-		// 	{true, true, true, true},
-		// 	{false, false, false, false},
-		// },
-		// {
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// 	{false, true, false, false},
-		// },
+	},
+	top:  0,
+	left: 4,
+}
+
+var sShape = shape{
+	name:      "S",
+	block:     cyan,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, true, false},
+			{false, true, true},
+			{false, false, true},
+		},
+		{
+			{false, false, false},
+			{false, true, true},
+			{true, true, false},
+		},
+		{
+			{true, false, false},
+			{true, true, false},
+			{false, true, false},
+		},
+		{
+			{false, true, true},
+			{true, true, false},
+			{false, false, false},
+		},
+	},
+	top:  0,
+	left: 4,
+}
+
+var zShape = shape{
+	name:      "S",
+	block:     magenta,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, true, false},
+			{true, true, false},
+			{true, false, false},
+		},
+		{
+			{true, true, false},
+			{false, true, true},
+			{false, false, false},
+		},
+		{
+			{false, false, true},
+			{false, true, true},
+			{false, true, false},
+		},
+		{
+			{false, false, false},
+			{true, true, false},
+			{false, true, true},
+		},
+	},
+	top:  0,
+	left: 4,
+}
+
+
+var tShape = shape{
+	name:      "T",
+	block:     black,
+	gridIndex: 0,
+	grids: []shapeGrid{
+		{
+			{false, true, false},
+			{true, true, true},
+			{false, false, false},
+		},
+		{
+			{false, true, false},
+			{false, true, true},
+			{false, true, false},
+		},
+		{
+			{false, false, false},
+			{true, true, true},
+			{false, true, false},
+		},
+		{
+			{false, true, false},
+			{true, true, false},
+			{false, true, false},
+		},
 	},
 	top:  0,
 	left: 4,
 }
 
 var shapeLib = []shape{
+	sShape,
+	tShape,
+	zShape,
 	iShape,
 	jShape,
 	lShape,
 	oShape,
+}
+
+
+type shapeGrid [][]bool
+
+type shape struct {
+	name      string
+	block     string
+	grids     []shapeGrid
+	gridIndex int
+	top       int
+	left      int
 }
