@@ -25,7 +25,7 @@ func handleInput(quitChan chan interface{}, inputChan chan string){
 			case 'q': // rotate
 				inputChan <- "rota"
 			case 27: // Quit
-				quitChan <- true
+				close(quitChan)
 				return
 			}
 		}

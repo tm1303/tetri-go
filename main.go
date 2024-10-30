@@ -56,5 +56,9 @@ func main() {
 	inputChan := make(chan string)
 
 	handleInput(quitChan, inputChan)
-	gameLoop(quitChan, inputChan)
+	go gameLoop(quitChan, inputChan)
+
+	<- quitChan
+
+	log.Info().Msg("quit message recieved, shutting down")
 }

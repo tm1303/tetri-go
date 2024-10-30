@@ -37,6 +37,11 @@ func rotate(r int, playShape *shape, binGrid *bin) {
 	render(grid)
 }
 
+// func xgameLoop()
+// {
+	
+// }
+
 func gameLoop(quitChan chan interface{}, inputChan chan string) {
 
 	pauseFactor := time.Duration(1000)
@@ -48,14 +53,9 @@ func gameLoop(quitChan chan interface{}, inputChan chan string) {
 
 	binGrid := make(bin, 0)
 
-	alive := true
-
 	go func() {
 		for {
 			select {
-			case <-quitChan:
-				alive = false
-				return
 			case action := <-inputChan:
 				switch action {
 				case "down":
@@ -73,38 +73,43 @@ func gameLoop(quitChan chan interface{}, inputChan chan string) {
 		}
 	}()
 
-	// Update grid values in a loop
-	for alive {
-		score++
+	for{
 
-		grid := updateGrid(playShape, &binGrid)
-		render(grid)
-		fmt.Printf("%sscore: %d\r\n", white, score)
-		time.Sleep(pauseFactor * time.Millisecond) // Pause for a second
+		select {
+		case <-quitChan:
+			log.Info().Msg("quit message recieved, killing loop")
+			return
+		case  <-time.After(pauseFactor * time.Millisecond):
+			score++
 
-		if !playPointsOk(playShape, &binGrid, 1, 0, 0) {
-			score = score + 2
-			binGrid = combinePoints(playShape, &binGrid) // get in the bin
-			removedCount := 0
-			binGrid, removedCount = tidyBin(binGrid)
-			if removedCount > 0 {
-				score = (4 * removedCount * removedCount) + score
-				pauseFactor = time.Duration(0.95 * float64(pauseFactor))
+			grid := updateGrid(playShape, &binGrid)
+			render(grid)
+			fmt.Printf("%sscore: %d\r\n", white, score)
+			time.Sleep(pauseFactor * time.Millisecond) // Pause for a second
+
+			if !playPointsOk(playShape, &binGrid, 1, 0, 0) {
+				score = score + 2
+				binGrid = combinePoints(playShape, &binGrid) // get in the bin
+				removedCount := 0
+				binGrid, removedCount = tidyBin(binGrid)
+				if removedCount > 0 {
+					score = (4 * removedCount * removedCount) + score
+					pauseFactor = time.Duration(0.95 * float64(pauseFactor))
+				}
+
+				shapeLibIndex++
+				if shapeLibIndex >= len(shapeLib) {
+					shapeLibIndex = 0
+				}
+				playShape = &shapeLib[shapeLibIndex]
+				playShape.top = -gridBuffer
+
+				log.Debug().Msgf("new shape %s\n", playShape.name)
+
 			}
 
-			shapeLibIndex++
-			if shapeLibIndex >= len(shapeLib) {
-				shapeLibIndex = 0
-			}
-			playShape = &shapeLib[shapeLibIndex]
-			playShape.top = -gridBuffer
-
-			log.Debug().Msgf("new shape %s\n", playShape.name)
-
-		}
-
-		dropShape(playShape) // Move down every loop iteration
-	}
+			dropShape(playShape) // Move down every loop iteration
+	}}
 }
 
 
